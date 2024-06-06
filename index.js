@@ -81,15 +81,34 @@ const handleSearch = async (ev) => {
  */
 const handleSubmit = async (ev) => {
 	ev.preventDefault();
-	const file = await getFileFromInput();
-	const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
-	store.add(file);
+
+	//const file = await getFileFromInput();
+	
+	getFileFromInputV2().then((files) => {
+
+		const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
+
+		files.forEach(file => {
+			console.log("file: ", file);
+			store.add(file);
+		});		
+
+		store.transaction.oncomplete = () => {
+			clearGalleryImages();
+			renderAvailableImagesFromDb();
+			renderStorageQuotaInfo();
+		};
+
+	});
+
+
+	/*store.add(file);
 
 	store.transaction.oncomplete = () => {
 		clearGalleryImages();
 		renderAvailableImagesFromDb();
 		renderStorageQuotaInfo();
-	};
+	};*/
 };
 
 /**
@@ -114,6 +133,56 @@ const getFileFromInput = () => {
 		};
 		reader.readAsArrayBuffer(file);
 	});
+};
+
+/**
+             *  Simple JavaScript Promise that reads a file as text.
+             **/
+const readFileArrayBuffer = (file) => {
+	return new Promise(function(resolve,reject){
+		const reader = new FileReader();
+
+		reader.onload = function(event){
+			resolve({
+				[storeKey]: file.name,
+				type: file.type,
+				size: file.size,
+				data: event.target.result,
+			});
+			//resolve(reader.result);
+		};
+
+		reader.onerror = function(){
+			reject(reader);
+			//reject(event.target.error);
+		};
+
+		reader.readAsArrayBuffer(file);
+	});
+}
+
+// Handle multiple fileuploads
+const getFileFromInputV2 = () => {
+	let files = document.getElementById('file').files;
+	let readers = [];
+
+	// Abort if there were no files selected
+	if(!files.length) return;
+
+	// Store promises in array
+	for(let i = 0;i < files.length;i++){
+		readers.push(readFileArrayBuffer(files[i]));
+	}
+
+	return Promise.all(readers);
+	
+	// Trigger Promises
+	/*Promise.all(readers).then((values) => {
+		// Values will be an array that contains an item
+		// with the text of every selected file
+		// ["File1 Content", "File2 Content" ... "FileN Content"]
+		console.log(values);
+	});*/
 };
 
 // Methods for the image gallery
