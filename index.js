@@ -1,5 +1,5 @@
 'use strict';
-
+const dbName = 'my-db';
 const storeName = 'localFiles';
 const storeKey = 'fileName';
 const dbVersion = 1;
@@ -83,7 +83,7 @@ const handleSubmit = async (ev) => {
 	ev.preventDefault();
 
 	//const file = await getFileFromInput();
-	
+
 	getFileFromInputV2().then((files) => {
 
 		const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
@@ -91,12 +91,15 @@ const handleSubmit = async (ev) => {
 		files.forEach(file => {
 			console.log("file: ", file);
 			store.add(file);
-		});		
+		});
 
 		store.transaction.oncomplete = () => {
 			clearGalleryImages();
 			renderAvailableImagesFromDb();
 			renderStorageQuotaInfo();
+
+			uploadFilesWorker();
+
 		};
 
 	});
@@ -136,13 +139,13 @@ const getFileFromInput = () => {
 };
 
 /**
-             *  Simple JavaScript Promise that reads a file as text.
-             **/
+			 *  Simple JavaScript Promise that reads a file as text.
+			 **/
 const readFileArrayBuffer = (file) => {
-	return new Promise(function(resolve,reject){
+	return new Promise(function (resolve, reject) {
 		const reader = new FileReader();
 
-		reader.onload = function(event){
+		reader.onload = function (event) {
 			resolve({
 				[storeKey]: file.name,
 				type: file.type,
@@ -152,7 +155,7 @@ const readFileArrayBuffer = (file) => {
 			//resolve(reader.result);
 		};
 
-		reader.onerror = function(){
+		reader.onerror = function () {
 			reject(reader);
 			//reject(event.target.error);
 		};
@@ -167,15 +170,15 @@ const getFileFromInputV2 = () => {
 	let readers = [];
 
 	// Abort if there were no files selected
-	if(!files.length) return;
+	if (!files.length) return;
 
 	// Store promises in array
-	for(let i = 0;i < files.length;i++){
+	for (let i = 0; i < files.length; i++) {
 		readers.push(readFileArrayBuffer(files[i]));
 	}
 
 	return Promise.all(readers);
-	
+
 	// Trigger Promises
 	/*Promise.all(readers).then((values) => {
 		// Values will be an array that contains an item
@@ -294,10 +297,38 @@ window.addEventListener('load', async () => {
 	// const requestPermission = await navigator.storage.persisted();
 	// const persistent = await navigator.storage.persist();
 	// if (persistent && requestPermission) {
-	db = await initIndexedDb('my-db', [{ name: storeName, keyPath: storeKey }]);
+	db = await initIndexedDb(dbName, [{ name: storeName, keyPath: storeKey }]);
 	renderAvailableImagesFromDb();
 	await renderStorageQuotaInfo();
 	// } else {
 	// 	console.warn('Persistence is not supported');
 	// }
 });
+
+const uploadFilesWorker = () => {
+	if (window.Worker) {
+		const myWorker = new Worker("filesWorker.js");
+
+		let filesInfo = {
+			proyectoId: 1,
+			accion: "CARGAR_ARCHIVOS",
+			dbName,
+			storeName, 
+			storeKey,
+			dbVersion
+		};
+
+		myWorker.postMessage(filesInfo);
+		console.log('Message posted to worker: ', filesInfo);
+
+		myWorker.onmessage = function (e) {
+			//result.textContent = e.data;
+			console.log('Message received from worker: ', e.data);
+		}
+
+	} else {
+		console.log('Your browser doesn\'t support web workers.');
+	}
+
+}
+
