@@ -198,7 +198,7 @@ const renderGalleryColumn = (cursor) => {
 	const imageBlog = new Blob([imageBuffer]);
 
 	const col = document.createElement('div');
-	col.classList.add('col-12', 'col-md-6', 'col-lg-4');
+	col.classList.add('col-12', 'col-md-6', 'col-lg-4', 'mb-3');
 
 	const card = document.createElement('div');
 	card.classList.add('card');
@@ -212,7 +212,7 @@ const renderGalleryColumn = (cursor) => {
 
 	const title = document.createElement('h5');
 	title.classList.add('card-title');
-	title.innerText = cursor.value['type'];
+	title.innerText = cursor.value[storeKey];
 
 	const subTitle = document.createElement('h6');
 	subTitle.classList.add('card-subtitle');
@@ -220,7 +220,7 @@ const renderGalleryColumn = (cursor) => {
 
 	const text = document.createElement('p');
 	text.classList.add('card-text');
-	text.innerText = cursor.value[storeKey];
+	text.innerText = cursor.value['type'];
 
 	const deleteButton = document.createElement('button');
 	deleteButton.classList.add('btn', 'btn-danger');
@@ -233,7 +233,7 @@ const renderGalleryColumn = (cursor) => {
 	cardBody.appendChild(subTitle);
 	cardBody.appendChild(text)
 	cardBody.appendChild(deleteButton);
-	card.appendChild(image);
+	//card.appendChild(image);
 	card.appendChild(cardBody);
 	col.appendChild(card);
 
