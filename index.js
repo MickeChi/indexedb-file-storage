@@ -103,15 +103,6 @@ const handleSubmit = async (ev) => {
 		};
 
 	});
-
-
-	/*store.add(file);
-
-	store.transaction.oncomplete = () => {
-		clearGalleryImages();
-		renderAvailableImagesFromDb();
-		renderStorageQuotaInfo();
-	};*/
 };
 
 /**
