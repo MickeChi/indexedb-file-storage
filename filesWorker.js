@@ -5,7 +5,7 @@ onmessage = function (e) {
 	const storeName = e.data.storeName;
 	const dbVersion = e.data.dbVersion;
 
-	let respuesta = { ...e.data };
+	let resultados = { ...e.data };
 
 	if (e.data.accion === "CARGAR_ARCHIVOS") {
 		const request = indexedDB.open(dbName, dbVersion);
@@ -34,22 +34,21 @@ onmessage = function (e) {
 
 			trans.oncomplete = (evt) => {
 
+				console.log("oncomplete files to upload: ", dataFiles);
+
 				uploadAllFiles(dataFiles)
 					.then(responseData => {
 						// Send the response data back to the main thread
 						console.log("uploadFileToServer success: ", responseData);
-						console.log("oncomplete uploadFileToServer: ", dataFiles);
-						respuesta = { ...respuesta, message: "Archivos cargados success" }
-						postMessage(respuesta);
-						//uploadResults.push({fileName: cursor.value['fileName'], upload: true});
-
+						resultados = { ...resultados, message: "Archivos cargados success", uploadResults: Array.from(responseData)};						
+						deleteAllEntriesFromIndexedDb(storeName, db, resultados);
+						
 					})
 					.catch(error => {
 						// Handle any errors that occur during the API call
 						console.error('uploadFileToServer Error:', error);
-						//uploadResults.push({fileName: cursor.value['fileName'], upload: false});
-						respuesta = { ...respuesta, message: "Archivos cargados con errores" }
-						postMessage(respuesta);
+						resultados = { ...resultados, message: "Archivos cargados con errores", uploadResults:[] }
+						deleteAllEntriesFromIndexedDb(storeName, db, resultados);
 
 					});
 
@@ -61,6 +60,32 @@ onmessage = function (e) {
 
 }
 
+const deleteAllEntriesFromIndexedDb = (storeName, db, resultados) => {
+	const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
+	store.clear();
+	store.transaction.oncomplete = () => {
+		postMessage(resultados);
+	};
+};
+
+const deleteEntriesFromIndexedDb = (storeName, db, resultados) => {
+
+
+	const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
+
+
+	resultados.uploadResults.forEach(item => {
+		if(item.mensaje === "SUCCESS"){
+			store.delete(item.proyectoFile.id);
+		}
+	});
+
+	store.transaction.oncomplete = async () => {
+		console.log("Se han eliminado los registros existosos");
+		postMessage(resultados);
+	};
+};
+
 
 const uploadAllFiles = (files) => {
 	let promisesFiles = [];
@@ -69,26 +94,33 @@ const uploadAllFiles = (files) => {
 	if (!files.length) return;
 
 	// Store promises in array
-	files.forEach(fileData => {
-		promisesFiles.push(uploadFileToServer(fileData));
+	files.forEach(fileInfo => {
+		promisesFiles.push(uploadFileToServer(fileInfo).catch(error => error));
 	});
 
 	return Promise.all(promisesFiles);
 };
 
-const uploadFileToServer = (datos) => {
-	let fileBlob = new Blob([datos.data]);
-	let file = new File([fileBlob], datos['fileName'], {
+const uploadFileToServer = (fileInfo) => {
+	let fileBlob = new Blob([fileInfo.fileData]);
+	let file = new File([fileBlob], fileInfo.fileName, {
 		type: fileBlob.type,
 	});
 
+	let proyectoFile = {...fileInfo};
+    delete proyectoFile.fileData;
 
 	let formData = new FormData()
 	formData.append("file", file);
+	formData.append("proyectoFile", JSON.stringify(proyectoFile));
 
-	// Create a new Promise to encapsulate the asynchronous API call
 	return new Promise((resolve, reject) => {
-		// Perform the API call using fetch or any other suitable method
+
+		//Simulando error en request
+		/*if(fileInfo.id === 3){
+			reject({mensaje: "ERROR", estatus: 500, resultado: null, proyectoFile});
+		}*/
+
 		//http://localhost:8081/api/proyecto/upload
 		//https://simple-server-3xmu.onrender.com/api/upload/file
 		fetch('http://localhost:8081/api/proyecto/upload', {
@@ -96,17 +128,22 @@ const uploadFileToServer = (datos) => {
 			body: formData
 		})
 			.then(response => {
+				console.log("response: ", response, proyectoFile);
 				if (response.ok) {
-					// Resolve the Promise with the response data
-					resolve(response.json());
+
+					response.json().then(resp => {
+						resolve({mensaje: "SUCCESS", estatus: response.status, resultado: resp, proyectoFile});
+					});
+					
 				} else {
-					// Reject the Promise with an error message
-					reject('API call failed with status: ' + response.status);
+					response.json().then(resp => {
+						reject({mensaje: "ERROR", estatus: response.status, resultado: resp, proyectoFile});
+					});
 				}
 			})
 			.catch(error => {
 				// Reject the Promise with any error that occurs during the API call
-				reject(error);
+				reject({mensaje: "ERROR", estatus: error.status, resultado: error, proyectoFile});
 			});
 	});
 

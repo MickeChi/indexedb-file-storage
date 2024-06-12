@@ -1,7 +1,7 @@
 'use strict';
-const dbName = 'my-db';
-const storeName = 'localFiles';
-const storeKey = 'fileName';
+const dbName = 'lotesDB';
+const storeName = 'projectFiles';
+const storeKey = 'id';
 const dbVersion = 1;
 let db = null;
 
@@ -17,10 +17,13 @@ const initIndexedDb = (dbName, stores) => {
 		};
 		request.onupgradeneeded = (event) => {
 			stores.forEach((store) => {
-				const objectStore = event.target.result.createObjectStore(store.name, {
-					keyPath: store.keyPath,
-				});
-				objectStore.createIndex(store.keyPath, store.keyPath, { unique: true });
+				const objectStore = event.target.result.createObjectStore(store.name, { keyPath: 'id', autoIncrement: true });
+				/*objectStore.createIndex('fileName', 'fileName', { unique: true });
+				objectStore.createIndex('fileData', 'fileData', { unique: false });
+				objectStore.createIndex('size', 'size', { unique: false, multiEntry: true });
+				objectStore.createIndex('type', 'type', { unique: false, multiEntry: false });
+				objectStore.createIndex('proyectoId', 'proyectoId', { unique: false });
+				objectStore.createIndex('fileNameCode', 'fileNameCode', { unique: false });*/
 			});
 		};
 	});
@@ -64,7 +67,7 @@ const handleSearch = async (ev) => {
 	db.transaction(storeName, 'readonly').objectStore(storeName).openCursor().onsuccess = (event) => {
 		const cursor = event.target.result;
 		if (cursor) {
-			if (cursor.value[storeKey].toLowerCase().includes(searchInput.toLowerCase())) {
+			if (cursor.value.fileName.toLowerCase().includes(searchInput.toLowerCase())) {
 				renderGalleryColumn(cursor);
 			}
 			cursor.continue();
@@ -85,11 +88,11 @@ const handleSubmit = async (ev) => {
 	//const file = await getFileFromInput();
 
 	getFileFromInputV2().then((files) => {
-
+		document.getElementById('file').value = '';
 		const store = db.transaction(storeName, 'readwrite').objectStore(storeName);
 
 		files.forEach(file => {
-			console.log("file: ", file);
+			console.log("file Add: ", file);
 			store.add(file);
 		});
 
@@ -137,13 +140,21 @@ const readFileArrayBuffer = (file) => {
 		const reader = new FileReader();
 
 		reader.onload = function (event) {
-			resolve({
+			/*resolve({
 				[storeKey]: file.name,
 				type: file.type,
 				size: file.size,
 				data: event.target.result,
+			});*/
+
+			resolve({
+				fileName: file.name,
+				fileData: event.target.result,
+				size: file.size,
+				type: file.type,
+				proyectoId: 1,
+				fileNameCode: 'P1U1'
 			});
-			//resolve(reader.result);
 		};
 
 		reader.onerror = function () {
@@ -194,7 +205,7 @@ const clearGalleryImages = () => {
  */
 const renderGalleryColumn = (cursor) => {
 	const galleryContainer = document.getElementById('images');
-	const imageBuffer = cursor.value.data;
+	const imageBuffer = cursor.value.fileData;
 	const imageBlog = new Blob([imageBuffer]);
 
 	const col = document.createElement('div');
@@ -212,11 +223,11 @@ const renderGalleryColumn = (cursor) => {
 
 	const title = document.createElement('h5');
 	title.classList.add('card-title');
-	title.innerText = cursor.value[storeKey];
+	title.innerText = cursor.value.fileName;
 
 	const subTitle = document.createElement('h6');
 	subTitle.classList.add('card-subtitle');
-	subTitle.innerText = formatAsByteString(+cursor.value['size'])
+	subTitle.innerText = formatAsByteString(+cursor.value.size)
 
 	const text = document.createElement('p');
 	text.classList.add('card-text');
@@ -226,7 +237,7 @@ const renderGalleryColumn = (cursor) => {
 	deleteButton.classList.add('btn', 'btn-danger');
 	deleteButton.innerText = 'Delete';
 	deleteButton.addEventListener('click', () => {
-		deleteImageFromIndexedDb(cursor.value[storeKey]);
+		deleteImageFromIndexedDb(cursor.value.fileName);
 	})
 
 	cardBody.appendChild(title);
@@ -304,7 +315,7 @@ const uploadFilesWorker = () => {
 			proyectoId: 1,
 			accion: "CARGAR_ARCHIVOS",
 			dbName,
-			storeName, 
+			storeName,
 			storeKey,
 			dbVersion
 		};
